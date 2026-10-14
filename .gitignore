@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# web-ext
+web-ext-artifacts/
+*.xpi
+*.zip
+
+# Logs / debug
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors / IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Env / secrets
+.env
+.env.*
+!.env.example

@@ -1,0 +1,24 @@
+{
+  "name": "youtube-samurai",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "mkdir -p ~/.tmp-web-ext && TMPDIR=~/.tmp-web-ext web-ext run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/m00fi/youtube-ai-summary-firefox-extension.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/m00fi/youtube-ai-summary-firefox-extension/issues"
+  },
+  "homepage": "https://github.com/m00fi/youtube-ai-summary-firefox-extension#readme",
+  "devDependencies": {
+    "@types/firefox-webext-browser": "^143.0.1"
+  }
+}

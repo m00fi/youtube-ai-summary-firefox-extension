@@ -1,0 +1,120 @@
+/* Blank box w prawym górnym rogu thumbnaila */
+.yt-ai-thumb-btn {
+  position: absolute !important;
+  top: 6px !important;
+  left: 6px !important;
+  z-index: 2200 !important;
+  width: 35px !important;
+  height: 35px !important;
+  min-width: 26px !important;
+  min-height: 26px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 2px solid #fff !important;
+  border-radius: 3px !important;
+  background: rgba(0, 0, 0, 0.25) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45) !important;
+  cursor: pointer !important;
+  appearance: none !important;
+  -moz-appearance: none !important;
+  pointer-events: auto !important;
+}
+
+.yt-ai-thumb-btn:hover {
+  background: rgba(0, 0, 0, 0.8) !important;
+  border-color: #fff !important;
+}
+
+/* Okienko z podsumowaniem (karta) */
+.yt-ai-card {
+  position: fixed;
+  top: 120px;
+  right: 24px;
+  z-index: 9999;
+  margin: 0;
+  width: min(420px, calc(100vw - 48px));
+  max-width: 650px;
+  background-color: rgba(30, 30, 30, 0.95);
+  color: #f1f1f1;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  font-family: Roboto, Arial, sans-serif;
+  overflow: hidden;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.yt-ai-card.hidden {
+  display: none;
+}
+
+.yt-ai-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.yt-ai-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.yt-ai-close-btn {
+  background: none;
+  border: none;
+  color: #aaa;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.yt-ai-close-btn:hover {
+  color: #fff;
+}
+
+.yt-ai-card-body {
+  padding: 14px 16px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.yt-ai-placeholder {
+  color: #888;
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-style: italic;
+}
+
+.yt-ai-dummy-list .yt-ai-bullet {
+  margin-bottom: 8px;
+}
+
+.yt-ai-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background-color: rgba(255, 255, 255, 0.02);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.yt-ai-action-btn {
+  background-color: #2a2a2a;
+  color: #eee;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.yt-ai-action-btn:hover {
+  background-color: #383838;
+}
