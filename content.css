@@ -88,8 +88,25 @@
 .yt-ai-placeholder {
   color: #888;
   margin-top: 0;
-  margin-bottom: 10px;
+  margin-bottom: 0;
   font-style: italic;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.yt-ai-placeholder.yt-ai-summary-text {
+  color: #f1f1f1;
+  font-style: normal;
+}
+
+.yt-ai-placeholder.yt-ai-loading {
+  color: #aaa;
+  font-style: italic;
+}
+
+.yt-ai-placeholder.yt-ai-error {
+  color: #f87171;
+  font-style: normal;
 }
 
 .yt-ai-dummy-list .yt-ai-bullet {
