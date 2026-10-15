@@ -1,4 +1,4 @@
-# <img src="ninja-3.svg" alt="" width="42" height="42" align="absmiddle" /> YouTube Samurai
+# <img src="ninja-3.svg" alt="" width="38" height="38" align="absmiddle" /> YouTube Samurai
 
 &nbsp;
 
