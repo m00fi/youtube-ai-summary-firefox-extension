@@ -44,7 +44,8 @@ function getOrCreateSummaryBox() {
   box.innerHTML = `
     <div class="yt-ai-card-header">
       <div class="yt-ai-card-title">
-        <span>SamurAI</span>
+        <img class="yt-ai-card-logo" src="${chrome.runtime.getURL("ninja-2.svg")}" alt="" draggable="false" />
+        <span>YouTube Samurai</span>
       </div>
       <button class="yt-ai-close-btn" id="yt-ai-close-btn" title="Close">&times;</button>
     </div>

@@ -63,7 +63,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 16px;
+  padding: 6px 16px;
   background-color: rgba(255, 255, 255, 0.05);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -73,16 +73,28 @@
   font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  margin-left: -6px;
+}
+
+.yt-ai-card-logo {
+  width: 28px;
+  height: 28px;
+  display: block;
+  flex-shrink: 0;
+  margin-block: -2px;
 }
 
 .yt-ai-close-btn {
   background: none;
   border: none;
   color: #aaa;
-  font-size: 20px;
+  font-size: 38px;
   cursor: pointer;
   padding: 0 4px;
+  margin-block: -4px;
+  margin-top: -8px;
+  margin-right: -10px;
   line-height: 1;
 }
 
