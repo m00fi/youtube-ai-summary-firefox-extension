@@ -10,6 +10,7 @@ const LANG_PRIORITY = ["en", "pl"];
 let observer = null;
 let injectScheduled = false;
 let currentTranscriptText = "";
+let activeSummaryVideoId = null;
 
 function isHomepage() {
   const path = location.pathname;
@@ -20,6 +21,7 @@ function removeUI() {
   document.querySelectorAll(".yt-ai-thumb-btn").forEach((el) => el.remove());
   document.getElementById("yt-ai-summary-box")?.remove();
   currentTranscriptText = "";
+  activeSummaryVideoId = null;
 }
 
 function setSummaryContent(text, { loading = false, error = false } = {}) {
@@ -59,6 +61,7 @@ function getOrCreateSummaryBox() {
 
   box.querySelector("#yt-ai-close-btn").addEventListener("click", () => {
     box.classList.add("hidden");
+    activeSummaryVideoId = null;
   });
 
   box.querySelector("#yt-ai-copy-btn").addEventListener("click", async (e) => {
@@ -327,7 +330,16 @@ async function onThumbButtonClick(event, videoId) {
   event.stopPropagation();
 
   const summaryBox = getOrCreateSummaryBox();
+  const isOpen = !summaryBox.classList.contains("hidden");
+
+  if (isOpen && videoId && videoId === activeSummaryVideoId) {
+    summaryBox.classList.add("hidden");
+    activeSummaryVideoId = null;
+    return;
+  }
+
   summaryBox.classList.remove("hidden");
+  activeSummaryVideoId = videoId || null;
 
   if (!videoId) {
     currentTranscriptText = "";
@@ -344,10 +356,14 @@ async function onThumbButtonClick(event, videoId) {
       throw new Error("Transcript is empty");
     }
 
+    // Ignore late response if user toggled away / closed meanwhile
+    if (activeSummaryVideoId !== videoId) return;
+
     const preview = transcript.slice(0, 1000);
     currentTranscriptText = preview;
     setSummaryContent(preview);
   } catch (err) {
+    if (activeSummaryVideoId !== videoId) return;
     console.warn("[YT Summarizer] Transcript error:", err);
     currentTranscriptText = "";
     setSummaryContent(err?.message || "Failed to fetch transcript.", { error: true });
