@@ -359,7 +359,7 @@ async function onThumbButtonClick(event, videoId) {
     // Ignore late response if user toggled away / closed meanwhile
     if (activeSummaryVideoId !== videoId) return;
 
-    const preview = transcript.slice(0, 1000);
+    const preview = transcript;
     currentTranscriptText = preview;
     setSummaryContent(preview);
   } catch (err) {

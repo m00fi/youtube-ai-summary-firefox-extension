@@ -39,13 +39,13 @@
 /* Okienko z podsumowaniem (karta) */
 .yt-ai-card {
   position: fixed;
-  bottom: 48px;
+  bottom: 24px; /*48*/
   right: 24px;
   z-index: 9999;
   margin: 0;
-  width: 700px;
+  width: 400px; /*700*/
   max-width: 650px;
-  background-color: rgba(15, 15, 15, 0.95);
+  background-color: rgba(15, 15, 15, 0.97);
   color: #f1f1f1;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 12px;
