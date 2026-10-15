@@ -372,6 +372,12 @@ function injectThumbButton(renderer) {
   btn.setAttribute("aria-label", "YouTube SamurAI");
   btn.dataset.videoId = videoId;
 
+  const icon = document.createElement("img");
+  icon.src = chrome.runtime.getURL("ninja-2.svg");
+  icon.alt = "";
+  icon.draggable = false;
+  btn.appendChild(icon);
+
   btn.addEventListener("click", (e) => onThumbButtonClick(e, videoId));
 
   container.appendChild(btn);
