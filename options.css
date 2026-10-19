@@ -1,0 +1,140 @@
+:root {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: #0f0f0f;
+  color: #f1f1f1;
+  font-family: Roboto, Arial, sans-serif;
+  font-size: 14px;
+}
+
+.options {
+  max-width: 440px;
+  margin: 48px auto;
+  padding: 0 16px;
+}
+
+.options-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.options-header h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+section {
+  background-color: #1c1c1c;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 8px 20px;
+  margin-bottom: 16px;
+}
+
+h2 {
+  margin: 12px 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #888;
+}
+
+label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+}
+
+label + label {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+label > span:first-child {
+  flex: 1;
+}
+
+input[type="number"],
+input[type="password"] {
+  width: 80px;
+  padding: 6px 8px;
+  background-color: #2a2a2a;
+  color: #f1f1f1;
+  border: 1px solid #444;
+  border-radius: 6px;
+  font: inherit;
+  text-align: right;
+}
+
+input.wide {
+  flex: 2;
+  width: auto;
+  min-width: 0;
+  text-align: left;
+}
+
+.hint {
+  margin: 0 0 12px;
+  color: #888;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.hint a {
+  color: #3ea6ff;
+}
+
+input:focus {
+  outline: none;
+  border-color: #3ea6ff;
+}
+
+.unit {
+  width: 26px;
+  color: #888;
+}
+
+.options-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.status {
+  flex: 1;
+  color: #4ade80;
+}
+
+button {
+  background-color: #f1f1f1;
+  color: #0f0f0f;
+  border: 1px solid #f1f1f1;
+  border-radius: 6px;
+  padding: 6px 16px;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #d9d9d9;
+}
+
+button.secondary {
+  background-color: #2a2a2a;
+  color: #eee;
+  border-color: #444;
+}
+
+button.secondary:hover {
+  background-color: #383838;
+}

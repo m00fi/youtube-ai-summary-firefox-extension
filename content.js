@@ -9,8 +9,24 @@ const LANG_PRIORITY = ["en", "pl"];
 
 let observer = null;
 let injectScheduled = false;
-let currentTranscriptText = "";
 let activeSummaryVideoId = null;
+let requestSeq = 0;
+let cancelActiveSummary = null;
+
+// Gotowe summary per videoId (do przeładowania strony) — ponowne otwarcie bez API
+const summaryCache = new Map();
+let settings = { ...DEFAULT_SETTINGS };
+
+// summary: co pokazać w trybie summary (state: "loading" | "streaming" | "error" | "text")
+const EMPTY_CARD_STATE = {
+  summary: { text: "", state: "loading", settingsLink: false },
+  transcript: "",
+  showTranscript: false,
+};
+let cardState = { ...EMPTY_CARD_STATE };
+
+// Błędy, które użytkownik naprawia w Options
+const SETTINGS_ERROR_CODES = ["NO_API_KEY", "BAD_API_KEY"];
 
 function isHomepage() {
   const path = location.pathname;
@@ -20,19 +36,59 @@ function isHomepage() {
 function removeUI() {
   document.querySelectorAll(".yt-ai-thumb-btn").forEach((el) => el.remove());
   document.getElementById("yt-ai-summary-box")?.remove();
-  currentTranscriptText = "";
+  cancelActiveSummary?.();
+  cardState = { ...EMPTY_CARD_STATE };
   activeSummaryVideoId = null;
 }
 
-function setSummaryContent(text, { loading = false, error = false } = {}) {
-  const box = getOrCreateSummaryBox();
-  const placeholder = box.querySelector(".yt-ai-placeholder");
-  if (!placeholder) return;
+function getCurrentView() {
+  const { summary, transcript, showTranscript } = cardState;
+  if (showTranscript && transcript) {
+    return { text: transcript, state: "text", settingsLink: false };
+  }
+  return summary;
+}
 
-  placeholder.textContent = text;
-  placeholder.classList.toggle("yt-ai-loading", loading);
-  placeholder.classList.toggle("yt-ai-error", error);
-  placeholder.classList.toggle("yt-ai-summary-text", !loading && !error);
+function renderCard() {
+  const box = getOrCreateSummaryBox();
+  const view = getCurrentView();
+  const placeholder = box.querySelector(".yt-ai-placeholder");
+
+  // Reset scrolla tylko przy nowej treści — nie przy dopisywaniu streamu
+  if (placeholder.textContent !== view.text) {
+    const isAppend = placeholder.textContent && view.text.startsWith(placeholder.textContent);
+    placeholder.textContent = view.text;
+    if (!isAppend) box.querySelector(".yt-ai-card-body").scrollTop = 0;
+  }
+
+  const isSummaryText = view.state === "text" || view.state === "streaming";
+  placeholder.classList.toggle("yt-ai-loading", view.state === "loading");
+  placeholder.classList.toggle("yt-ai-error", view.state === "error");
+  placeholder.classList.toggle("yt-ai-summary-text", isSummaryText);
+  placeholder.classList.toggle("yt-ai-streaming", view.state === "streaming");
+
+  box.querySelector("#yt-ai-settings-btn").hidden = !view.settingsLink;
+
+  const words = cardState.transcript.split(/\s+/).filter(Boolean).length;
+  box.querySelector(".yt-ai-card-meta").textContent = words
+    ? `Transcript: ${words.toLocaleString()} words`
+    : "";
+
+  const toggleBtn = box.querySelector("#yt-ai-toggle-btn");
+  toggleBtn.hidden = !cardState.transcript;
+  toggleBtn.textContent = cardState.showTranscript ? "Summary" : "Transcript";
+
+  box.querySelector("#yt-ai-copy-btn").disabled = view.state !== "text";
+}
+
+function setSummaryState(text, state, { settingsLink = false } = {}) {
+  cardState.summary = { text, state, settingsLink };
+  renderCard();
+}
+
+function applyCardSize(box) {
+  box.style.setProperty("--yt-ai-card-width", `${settings.cardWidth}px`);
+  box.style.setProperty("--yt-ai-card-height", `${settings.cardHeight}px`);
 }
 
 function getOrCreateSummaryBox() {
@@ -52,21 +108,36 @@ function getOrCreateSummaryBox() {
       <button class="yt-ai-close-btn" id="yt-ai-close-btn" title="Close">&times;</button>
     </div>
     <div class="yt-ai-card-body">
-      <p class="yt-ai-placeholder">PLACE FOR AI SUMMARY</p>
+      <p class="yt-ai-placeholder"></p>
+      <button class="yt-ai-action-btn" id="yt-ai-settings-btn" hidden>Open settings</button>
     </div>
     <div class="yt-ai-card-footer">
-      <button class="yt-ai-action-btn" id="yt-ai-copy-btn">Copy</button>
+      <span class="yt-ai-card-meta"></span>
+      <div class="yt-ai-card-actions">
+        <button class="yt-ai-action-btn" id="yt-ai-toggle-btn" hidden>Transcript</button>
+        <button class="yt-ai-action-btn" id="yt-ai-copy-btn">Copy</button>
+      </div>
     </div>
   `;
 
   box.querySelector("#yt-ai-close-btn").addEventListener("click", () => {
+    cancelActiveSummary?.();
     box.classList.add("hidden");
     activeSummaryVideoId = null;
   });
 
+  box.querySelector("#yt-ai-settings-btn").addEventListener("click", () => {
+    chrome.runtime.sendMessage({ type: "openOptions" });
+  });
+
+  box.querySelector("#yt-ai-toggle-btn").addEventListener("click", () => {
+    cardState.showTranscript = !cardState.showTranscript;
+    renderCard();
+  });
+
   box.querySelector("#yt-ai-copy-btn").addEventListener("click", async (e) => {
     const btn = e.currentTarget;
-    const text = currentTranscriptText || box.querySelector(".yt-ai-placeholder")?.textContent || "";
+    const text = getCurrentView().text;
     try {
       await navigator.clipboard.writeText(text);
       btn.textContent = "Copied!";
@@ -76,6 +147,7 @@ function getOrCreateSummaryBox() {
     setTimeout(() => { btn.textContent = "Copy"; }, 1500);
   });
 
+  applyCardSize(box);
   document.body.appendChild(box);
   return box;
 }
@@ -298,7 +370,17 @@ async function fetchTrackText(baseUrl) {
 }
 
 async function fetchTranscript(videoId) {
+  const startedAt = performance.now();
   const player = await getPlayerResponse(videoId);
+  console.log(`[YT Summarizer] Player response: ${Math.round(performance.now() - startedAt)} ms`);
+
+  // lengthSeconds is "0" for live streams — skip the check when unknown
+  const lengthSeconds = Number(player?.videoDetails?.lengthSeconds) || 0;
+  if (lengthSeconds > settings.maxVideoMinutes * 60) {
+    const videoMinutes = Math.round(lengthSeconds / 60);
+    throw new Error(`Video is too long (${videoMinutes} min, max ${settings.maxVideoMinutes} min)`);
+  }
+
   const tracks = getCaptionTracks(player);
 
   if (!tracks.length) {
@@ -325,12 +407,70 @@ function findThumbnailContainer(renderer) {
   );
 }
 
+// Port do tła: summary przychodzi kawałkami (onText), disconnect przerywa request w tle.
+function streamSummary(transcript, onText) {
+  return new Promise((resolve, reject) => {
+    let finished = false;
+    const fail = (message, code) => {
+      finished = true;
+      cancelActiveSummary = null;
+      reject(Object.assign(new Error(message), { code }));
+    };
+
+    let port;
+    try {
+      port = chrome.runtime.connect({ name: "summarize" });
+    } catch (err) {
+      fail(err?.message || String(err), "EXTENSION");
+      return;
+    }
+
+    cancelActiveSummary = () => {
+      if (finished) return;
+      port.disconnect();
+      fail("Cancelled.", "CANCELLED");
+    };
+
+    port.onMessage.addListener((msg) => {
+      if (msg.type === "chunk") {
+        onText(msg.text);
+        return;
+      }
+      finished = true;
+      cancelActiveSummary = null;
+      port.disconnect();
+      if (msg.type === "done") resolve(msg.summary);
+      else reject(Object.assign(new Error(msg.error), { code: msg.code }));
+    });
+
+    port.onDisconnect.addListener((p) => {
+      if (finished) return;
+      fail(p?.error?.message || chrome.runtime.lastError?.message || "Background disconnected", "EXTENSION");
+    });
+
+    port.postMessage({ transcript });
+  });
+}
+
+function describeSummaryError(err) {
+  if (err.code !== "EXTENSION") return err.message;
+  // Po przeładowaniu rozszerzenia stary content script traci połączenie:
+  // Chrome — brak chrome.runtime.id, Firefox — "Receiving end does not exist"
+  const reloaded =
+    !chrome.runtime?.id || /context invalidated|receiving end does not exist/i.test(err.message);
+  return reloaded
+    ? "Extension was reloaded — refresh the page."
+    : `Could not reach the extension background (${err.message}).`;
+}
+
 async function onThumbButtonClick(event, videoId) {
   event.preventDefault();
   event.stopPropagation();
 
   const summaryBox = getOrCreateSummaryBox();
   const isOpen = !summaryBox.classList.contains("hidden");
+
+  cancelActiveSummary?.();
 
   if (isOpen && videoId && videoId === activeSummaryVideoId) {
     summaryBox.classList.add("hidden");
@@ -340,33 +480,57 @@ async function onThumbButtonClick(event, videoId) {
 
   summaryBox.classList.remove("hidden");
   activeSummaryVideoId = videoId || null;
+  cardState = { ...EMPTY_CARD_STATE };
 
   if (!videoId) {
-    currentTranscriptText = "";
-    setSummaryContent("Could not resolve video id.", { error: true });
+    setSummaryState("Could not resolve video id.", "error");
     return;
   }
 
-  currentTranscriptText = "";
-  setSummaryContent("Loading transcript…", { loading: true });
+  // Ignore late responses if user switched video / closed meanwhile
+  const requestId = ++requestSeq;
+  const isCurrent = () => requestId === requestSeq && activeSummaryVideoId === videoId;
 
+  const cached = summaryCache.get(videoId);
+  if (cached) {
+    cardState.transcript = cached.transcript;
+    setSummaryState(cached.summary, "text");
+    return;
+  }
+
+  setSummaryState("Loading transcript…", "loading");
+
+  let transcript;
+  let startedAt = performance.now();
   try {
-    const transcript = await fetchTranscript(videoId);
-    if (!transcript) {
-      throw new Error("Transcript is empty");
-    }
-
-    // Ignore late response if user toggled away / closed meanwhile
-    if (activeSummaryVideoId !== videoId) return;
-
-    const preview = transcript;
-    currentTranscriptText = preview;
-    setSummaryContent(preview);
+    transcript = await fetchTranscript(videoId);
+    if (!transcript) throw new Error("Transcript is empty");
+    console.log(`[YT Summarizer] Transcript: ${Math.round(performance.now() - startedAt)} ms`);
   } catch (err) {
-    if (activeSummaryVideoId !== videoId) return;
+    if (!isCurrent()) return;
     console.warn("[YT Summarizer] Transcript error:", err);
-    currentTranscriptText = "";
-    setSummaryContent(err?.message || "Failed to fetch transcript.", { error: true });
+    setSummaryState(`Transcript error: ${err?.message || "failed to fetch transcript."}`, "error");
+    return;
+  }
+
+  if (!isCurrent()) return;
+  cardState.transcript = transcript;
+  setSummaryState("Generating summary…", "loading");
+
+  startedAt = performance.now();
+  try {
+    const summary = await streamSummary(transcript, (text) => {
+      if (isCurrent()) setSummaryState(text, "streaming");
+    });
+    console.log(`[YT Summarizer] Summary: ${Math.round(performance.now() - startedAt)} ms`);
+    summaryCache.set(videoId, { transcript, summary });
+    if (isCurrent()) setSummaryState(summary, "text");
+  } catch (err) {
+    if (err.code === "CANCELLED" || !isCurrent()) return;
+    console.warn("[YT Summarizer] Summary error:", err);
+    setSummaryState(`Summary error: ${describeSummaryError(err)}`, "error", {
+      settingsLink: SETTINGS_ERROR_CODES.includes(err.code),
+    });
   }
 }
 
@@ -425,6 +589,22 @@ function ensureObserver() {
   observer = new MutationObserver(scheduleInject);
   observer.observe(document.documentElement, { childList: true, subtree: true });
 }
+
+loadSettings().then((loaded) => {
+  settings = loaded;
+  const box = document.getElementById("yt-ai-summary-box");
+  if (box) applyCardSize(box);
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local") return;
+  const updated = Object.fromEntries(
+    Object.entries(changes).map(([key, change]) => [key, change.newValue])
+  );
+  settings = sanitizeSettings({ ...settings, ...updated });
+  const box = document.getElementById("yt-ai-summary-box");
+  if (box) applyCardSize(box);
+});
 
 document.addEventListener("yt-navigate-finish", () => {
   removeUI();

@@ -25,6 +25,11 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+*.crx
 
 # Local project notes
 STRUCTURE.md
+REGULATIONS.md
+CLAUDE.md

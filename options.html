@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>YouTube Samurai — Options</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <main class="options">
+    <header class="options-header">
+      <img src="ninja-2.svg" alt="" width="36" height="36" />
+      <h1>YouTube Samurai</h1>
+    </header>
+
+    <form id="options-form">
+      <section>
+        <h2>Card</h2>
+        <label>
+          <span>Width</span>
+          <input type="number" id="cardWidth" min="300" max="1200" step="10" required />
+          <span class="unit">px</span>
+        </label>
+        <label>
+          <span>Max height</span>
+          <input type="number" id="cardHeight" min="200" max="1200" step="10" required />
+          <span class="unit">px</span>
+        </label>
+      </section>
+
+      <section>
+        <h2>Transcript</h2>
+        <label>
+          <span>Max video length</span>
+          <input type="number" id="maxVideoMinutes" min="1" max="600" step="1" required />
+          <span class="unit">min</span>
+        </label>
+      </section>
+
+      <section>
+        <h2>Gemini API</h2>
+        <label>
+          <span>API key</span>
+          <input type="password" id="apiKey" class="wide" placeholder="AIza…" autocomplete="off" spellcheck="false" />
+        </label>
+        <p class="hint">
+          Stored only in this browser. Get a key at
+          <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.
+        </p>
+      </section>
+
+      <footer class="options-footer">
+        <span id="status" class="status" role="status"></span>
+        <button type="button" id="reset-btn" class="secondary">Reset</button>
+        <button type="submit">Save</button>
+      </footer>
+    </form>
+  </main>
+
+  <script src="settings.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

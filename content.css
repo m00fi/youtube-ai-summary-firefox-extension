@@ -43,29 +43,34 @@
   right: 24px;
   z-index: 9999;
   margin: 0;
-  width: 400px; /*700*/
-  max-width: 650px;
-  background-color: rgba(15, 15, 15, 0.97);
+  display: flex;
+  flex-direction: column;
+  width: var(--yt-ai-card-width, 520px);
+  max-width: calc(100vw - 48px);
+  max-height: min(var(--yt-ai-card-height, 680px), calc(100vh - 48px));
+  background-color: #1c1c1c;
   color: #f1f1f1;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
   font-family: Roboto, Arial, sans-serif;
   overflow: hidden;
   transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
-.yt-ai-card.hidden {
-  display: none;
+.yt-ai-card.hidden,
+.yt-ai-card [hidden] {
+  display: none !important;
 }
 
 .yt-ai-card-header {
   display: flex;
+  flex-shrink: 0;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 16px;
-  background-color: rgba(255, 255, 255, 0.05);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 8px 16px;
+  background-color: #242424;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .yt-ai-card-title {
@@ -103,9 +108,27 @@
 }
 
 .yt-ai-card-body {
-  padding: 14px 16px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 20px;
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.65;
+  scrollbar-width: thin;
+  scrollbar-color: #4a4a4a transparent;
+}
+
+.yt-ai-card-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.yt-ai-card-body::-webkit-scrollbar-thumb {
+  background-color: #4a4a4a;
+  border-radius: 4px;
+}
+
+.yt-ai-card-body::-webkit-scrollbar-thumb:hover {
+  background-color: #5c5c5c;
 }
 
 .yt-ai-placeholder {
@@ -127,9 +150,41 @@
   font-style: italic;
 }
 
+.yt-ai-placeholder.yt-ai-loading::before {
+  content: "";
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 10px;
+  vertical-align: -1px;
+  border: 2px solid #555;
+  border-top-color: #f1f1f1;
+  border-radius: 50%;
+  animation: yt-ai-spin 0.8s linear infinite;
+}
+
+@keyframes yt-ai-spin {
+  to { transform: rotate(360deg); }
+}
+
+.yt-ai-placeholder.yt-ai-streaming::after {
+  content: "▍";
+  margin-left: 2px;
+  color: #aaa;
+  animation: yt-ai-blink 1s steps(1) infinite;
+}
+
+@keyframes yt-ai-blink {
+  50% { opacity: 0; }
+}
+
 .yt-ai-placeholder.yt-ai-error {
   color: #f87171;
   font-style: normal;
+}
+
+#yt-ai-settings-btn {
+  margin-top: 12px;
 }
 
 .yt-ai-dummy-list .yt-ai-bullet {
@@ -138,11 +193,22 @@
 
 .yt-ai-card-footer {
   display: flex;
+  flex-shrink: 0;
   justify-content: space-between;
   align-items: center;
   padding: 8px 16px;
-  background-color: rgba(255, 255, 255, 0.02);
+  background-color: #242424;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.yt-ai-card-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.yt-ai-card-meta {
+  color: #888;
+  font-size: 12px;
 }
 
 .yt-ai-action-btn {
@@ -150,11 +216,17 @@
   color: #eee;
   border: 1px solid #444;
   border-radius: 6px;
-  padding: 4px 10px;
+  padding: 5px 14px;
   font-size: 12px;
   cursor: pointer;
+  transition: background-color 0.15s ease;
 }
 
-.yt-ai-action-btn:hover {
+.yt-ai-action-btn:hover:not(:disabled) {
   background-color: #383838;
+}
+
+.yt-ai-action-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
