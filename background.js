@@ -1,14 +1,11 @@
-// Background: wywołania Gemini API. Klucz nie opuszcza tego kontekstu.
+// Background: wywołania API providerów AI. Klucze nie opuszczają tego kontekstu.
 
 // Chrome (service worker) nie ładuje "scripts" z manifestu — dociągamy settings.js ręcznie.
-if (typeof loadApiKey === "undefined" && typeof importScripts === "function") {
+if (typeof loadProviderConfig === "undefined" && typeof importScripts === "function") {
   importScripts("settings.js");
 }
 
-const GEMINI_MODEL = "gemini-3.8-flash";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse`;
-
-const IDLE_TIMEOUT_MS = 45_000; // brak żadnych danych od Gemini przez 45 s → przerwij
+const IDLE_TIMEOUT_MS = 45_000; // brak żadnych danych od API przez 45 s → przerwij
 const RETRY_DELAY_MS = 1500; // jeden retry przy 429/5xx/błędzie sieci
 
 const SYSTEM_PROMPT = `You summarize YouTube video transcripts.
@@ -30,19 +27,124 @@ class SummaryError extends Error {
   }
 }
 
-function errorFromResponse(status, data) {
+// Modele Claude z serwerowym fallbackiem przy odmowie (Haiku go nie ma — parametr dałby 400)
+const ANTHROPIC_FALLBACK_MODELS = ["claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5"];
+
+// Każdy provider: request (url/headers/body) + parseEvent → { text, finishReason }
+const PROVIDER_APIS = {
+  gemini: {
+    url: (model) =>
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`,
+    headers: (apiKey) => ({ "x-goog-api-key": apiKey }),
+    body: (model, transcript) => ({
+      system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      contents: [{ role: "user", parts: [{ text: `Transcript:\n\n${transcript}` }] }],
+      // Domyślnie "medium" — "low" wyraźnie skraca czas odpowiedzi
+      generationConfig: { temperature: 0.3, thinkingConfig: { thinkingLevel: "low" } },
+    }),
+    parseEvent(event, label) {
+      if (event.error) {
+        throw new SummaryError(`${label} error: ${event.error.message || "stream failed"}`);
+      }
+      const blockReason = event.promptFeedback?.blockReason;
+      if (blockReason) {
+        throw new SummaryError(`${label} blocked the request (${blockReason}).`, "BLOCKED");
+      }
+      const candidate = event.candidates?.[0];
+      const text = (candidate?.content?.parts || [])
+        .filter((part) => !part.thought)
+        .map((part) => part.text || "")
+        .join("");
+      return { text, finishReason: candidate?.finishReason };
+    },
+  },
+
+  openai: {
+    url: () => "https://api.openai.com/v1/chat/completions",
+    headers: (apiKey) => ({ Authorization: `Bearer ${apiKey}` }),
+    body: (model, transcript) => {
+      // Modele reasoning (gpt-5*, o*) nie przyjmują temperature, za to mają reasoning_effort
+      const reasoning = /^(gpt-5|o\d)/.test(model);
+      return {
+        model,
+        stream: true,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: `Transcript:\n\n${transcript}` },
+        ],
+        ...(reasoning ? { reasoning_effort: "low" } : { temperature: 0.3 }),
+      };
+    },
+    parseEvent(event, label) {
+      if (event.error) {
+        throw new SummaryError(`${label} error: ${event.error.message || "stream failed"}`);
+      }
+      const choice = event.choices?.[0];
+      if (choice?.finish_reason === "content_filter") {
+        throw new SummaryError(`${label} blocked the request (content filter).`, "BLOCKED");
+      }
+      return { text: choice?.delta?.content || "", finishReason: choice?.finish_reason };
+    },
+  },
+
+  anthropic: {
+    url: () => "https://api.anthropic.com/v1/messages",
+    headers: (apiKey, model) => ({
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      // Firefox wysyła Origin moz-extension:// — bez tego nagłówka API odrzuca request
+      "anthropic-dangerous-direct-browser-access": "true",
+      ...(ANTHROPIC_FALLBACK_MODELS.includes(model) ? { "anthropic-beta": "server-side-fallback-2026-07-01" } : {}),
+    }),
+    body: (model, transcript) => ({
+      model,
+      max_tokens: 16000,
+      stream: true,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: "user", content: `Transcript:\n\n${transcript}` }],
+      // Rodzina 5.x: thinking zawsze włączony, "low" skraca czas odpowiedzi; temperature dałoby 400
+      ...(/^claude-[a-z]+-5/.test(model) ? { output_config: { effort: "low" } } : {}),
+      ...(ANTHROPIC_FALLBACK_MODELS.includes(model) ? { fallbacks: "default" } : {}),
+    }),
+    parseEvent(event, label) {
+      if (event.type === "error") {
+        const overloaded = event.error?.type === "overloaded_error";
+        throw new SummaryError(
+          overloaded
+            ? `${label} is overloaded right now. Try again in a moment.`
+            : `${label} error: ${event.error?.message || "stream failed"}`,
+          overloaded ? "OVERLOADED" : "API_ERROR",
+          { retryable: overloaded }
+        );
+      }
+      if (event.type === "content_block_delta" && event.delta?.type === "text_delta") {
+        return { text: event.delta.text };
+      }
+      if (event.type === "message_delta") {
+        const finishReason = event.delta?.stop_reason;
+        if (finishReason === "refusal") {
+          throw new SummaryError(`${label} declined to summarize this transcript.`, "BLOCKED");
+        }
+        return { text: "", finishReason };
+      }
+      return { text: "" };
+    },
+  },
+};
+
+function errorFromResponse(label, status, data) {
   const apiMessage = data?.error?.message || `HTTP ${status}`;
-  // Zły klucz: Gemini zwraca 400 "API key not valid", czasem 401/403
+  // Zły klucz: 401/403, Gemini zwraca też 400 "API key not valid"
   if (status === 401 || status === 403 || (status === 400 && /api key/i.test(apiMessage))) {
-    return new SummaryError("Gemini rejected the API key.", "BAD_API_KEY");
+    return new SummaryError(`${label} rejected the API key.`, "BAD_API_KEY");
   }
   if (status === 429) {
-    return new SummaryError("Gemini rate limit or quota exceeded. Try again later.", "RATE_LIMIT", { retryable: true });
+    return new SummaryError(`${label} rate limit or quota exceeded. Try again later.`, "RATE_LIMIT", { retryable: true });
   }
   if (status >= 500) {
-    return new SummaryError("Gemini is overloaded right now. Try again in a moment.", "OVERLOADED", { retryable: true });
+    return new SummaryError(`${label} is overloaded right now. Try again in a moment.`, "OVERLOADED", { retryable: true });
   }
-  return new SummaryError(`Gemini error: ${apiMessage}`);
+  return new SummaryError(`${label} error: ${apiMessage}`);
 }
 
 function cleanSummary(text) {
@@ -61,7 +163,8 @@ async function* readSseEvents(body, onActivity) {
       .filter((line) => line.startsWith("data:"))
       .map((line) => line.slice(5).trimStart())
       .join("\n");
-    return data ? JSON.parse(data) : null;
+    // OpenAI kończy stream linią "data: [DONE]"
+    return data && data !== "[DONE]" ? JSON.parse(data) : null;
   };
 
   while (true) {
@@ -82,55 +185,35 @@ async function* readSseEvents(body, onActivity) {
   if (last) yield last;
 }
 
-async function streamOnce(apiKey, transcript, { signal, onText, onActivity }) {
+async function streamOnce({ provider, apiKey, model }, transcript, { signal, onText, onActivity }) {
+  const api = PROVIDER_APIS[provider];
+  const { label } = PROVIDERS[provider];
+
   let res;
   try {
-    res = await fetch(GEMINI_URL, {
+    res = await fetch(api.url(model), {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        contents: [{ role: "user", parts: [{ text: `Transcript:\n\n${transcript}` }] }],
-        // Domyślnie "medium" — "low" wyraźnie skraca czas odpowiedzi
-        generationConfig: { temperature: 0.3, thinkingConfig: { thinkingLevel: "low" } },
-      }),
+      headers: { "Content-Type": "application/json", ...api.headers(apiKey, model) },
+      body: JSON.stringify(api.body(model, transcript)),
       signal,
     });
   } catch (err) {
     if (signal.aborted) throw err;
-    throw new SummaryError("Could not reach Gemini API. Check your connection.", "NETWORK", { retryable: true });
+    throw new SummaryError(`Could not reach ${label} API. Check your connection.`, "NETWORK", { retryable: true });
   }
 
   if (!res.ok) {
-    throw errorFromResponse(res.status, await res.json().catch(() => null));
+    throw errorFromResponse(label, res.status, await res.json().catch(() => null));
   }
 
   let text = "";
   let finishReason = null;
 
   for await (const event of readSseEvents(res.body, onActivity)) {
-    if (event.error) {
-      throw new SummaryError(`Gemini error: ${event.error.message || "stream failed"}`);
-    }
-
-    const blockReason = event.promptFeedback?.blockReason;
-    if (blockReason) {
-      throw new SummaryError(`Gemini blocked the request (${blockReason}).`, "BLOCKED");
-    }
-
-    const candidate = event.candidates?.[0];
-    finishReason = candidate?.finishReason || finishReason;
-
-    const chunk = (candidate?.content?.parts || [])
-      .filter((part) => !part.thought)
-      .map((part) => part.text || "")
-      .join("");
-
-    if (chunk) {
-      text += chunk;
+    const parsed = api.parseEvent(event, label);
+    finishReason = parsed.finishReason || finishReason;
+    if (parsed.text) {
+      text += parsed.text;
       onText(cleanSummary(text));
     }
   }
@@ -138,24 +221,30 @@ async function streamOnce(apiKey, transcript, { signal, onText, onActivity }) {
   const summary = cleanSummary(text);
   if (!summary) {
     throw new SummaryError(
-      finishReason ? `Gemini returned no summary (${finishReason}).` : "Gemini returned an empty summary."
+      finishReason ? `${label} returned no summary (${finishReason}).` : `${label} returned an empty summary.`
     );
   }
   return summary;
 }
 
 async function streamSummary(transcript, { signal, onText, onActivity }) {
-  const apiKey = await loadApiKey();
-  if (!apiKey) {
-    throw new SummaryError("No Gemini API key set.", "NO_API_KEY");
+  const config = await loadProviderConfig();
+  const target = {
+    provider: config.provider,
+    apiKey: config.apiKeys[config.provider],
+    model: config.models[config.provider],
+  };
+  const { label } = PROVIDERS[target.provider];
+  if (!target.apiKey) {
+    throw new SummaryError(`No ${label} API key set.`, "NO_API_KEY");
   }
 
   for (let attempt = 0; ; attempt++) {
     try {
-      return await streamOnce(apiKey, transcript, { signal, onText, onActivity });
+      return await streamOnce(target, transcript, { signal, onText, onActivity });
     } catch (err) {
       if (!err.retryable || attempt >= 1 || signal.aborted) throw err;
-      console.warn("[YT Summarizer] Gemini failed, retrying:", err.message);
+      console.warn(`[YT Summarizer] ${label} failed, retrying:`, err.message);
       await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
       onActivity();
     }
@@ -173,7 +262,7 @@ chrome.runtime.onConnect.addListener((port) => {
   const onActivity = () => {
     clearTimeout(idleTimer);
     idleTimer = setTimeout(() => {
-      controller.abort(new SummaryError("Gemini took too long to respond. Try again.", "TIMEOUT"));
+      controller.abort(new SummaryError("The AI provider took too long to respond. Try again.", "TIMEOUT"));
     }, IDLE_TIMEOUT_MS);
   };
 

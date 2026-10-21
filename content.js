@@ -602,6 +602,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
     Object.entries(changes).map(([key, change]) => [key, change.newValue])
   );
   settings = sanitizeSettings({ ...settings, ...updated });
+  // Inny provider/model → summary z cache pochodzą ze starego modelu
+  const aiKeys = [PROVIDER_STORAGE_KEY, ...Object.keys(PROVIDERS).map((id) => providerStorageKeys(id).model)];
+  if (aiKeys.some((key) => key in changes)) summaryCache.clear();
   const box = document.getElementById("yt-ai-summary-box");
   if (box) applyCardSize(box);
 });

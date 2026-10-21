@@ -63,7 +63,9 @@ label > span:first-child {
 }
 
 input[type="number"],
-input[type="password"] {
+input[type="password"],
+input[type="text"],
+select {
   width: 80px;
   padding: 6px 8px;
   background-color: #2a2a2a;
@@ -72,6 +74,11 @@ input[type="password"] {
   border-radius: 6px;
   font: inherit;
   text-align: right;
+}
+
+select {
+  width: auto;
+  text-align: left;
 }
 
 input.wide {
@@ -92,7 +99,8 @@ input.wide {
   color: #3ea6ff;
 }
 
-input:focus {
+input:focus,
+select:focus {
   outline: none;
   border-color: #3ea6ff;
 }

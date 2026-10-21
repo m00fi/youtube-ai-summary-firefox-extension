@@ -37,16 +37,16 @@
       </section>
 
       <section>
-        <h2>Gemini API</h2>
+        <h2>AI provider</h2>
         <label>
-          <span>API key</span>
-          <input type="password" id="apiKey" class="wide" placeholder="AIza…" autocomplete="off" spellcheck="false" />
+          <span>Use for summaries</span>
+          <select id="provider"></select>
         </label>
-        <p class="hint">
-          Stored only in this browser. Get a key at
-          <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.
-        </p>
+        <p class="hint">API keys are stored only in this browser.</p>
       </section>
+
+      <!-- Sekcje providerów generuje options.js z PROVIDERS (settings.js) -->
+      <div id="provider-sections"></div>
 
       <footer class="options-footer">
         <span id="status" class="status" role="status"></span>

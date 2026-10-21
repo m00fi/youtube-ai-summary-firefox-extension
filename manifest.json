@@ -3,12 +3,22 @@
   "name": "YouTube SamurAI",
   "version": "0.1.0",
   "description": "Youtube AI Summary",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "youtube-samurai@m00fi",
+      "data_collection_permissions": {
+        "required": ["websiteContent"]
+      }
+    }
+  },
   "permissions": [
     "storage"
   ],
   "host_permissions": [
     "*://*.youtube.com/*",
-    "https://generativelanguage.googleapis.com/*"
+    "https://generativelanguage.googleapis.com/*",
+    "https://api.openai.com/*",
+    "https://api.anthropic.com/*"
   ],
   "background": {
     "service_worker": "background.js",
